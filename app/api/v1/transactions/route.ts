@@ -27,7 +27,10 @@ export async function GET(request: NextRequest) {
     const params = request.nextUrl.searchParams;
 
     const offset = Number(params.get("offset") ?? 0);
-    const limit = Math.min(Number(params.get("limit") ?? 30), 100);
+    const limit = Math.min(
+      Number(params.get("limit") ?? 30),
+      100
+    );
 
     let query = client
       .from("transactions")
@@ -42,7 +45,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (params.get("categoryId")) {
-      query = query.eq("category_id", params.get("categoryId"));
+      query = query.eq(
+        "category_id",
+        params.get("categoryId")
+      );
     }
 
     if (params.get("paymentMethodId")) {
@@ -60,7 +66,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data });
   } catch (error) {
-    console.error("GET /api/v1/transactions error:", error);
+    console.error(
+      "GET /api/v1/transactions error:",
+      error
+    );
 
     return NextResponse.json(
       {
@@ -124,7 +133,10 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("POST /api/v1/transactions error:", error);
+    console.error(
+      "POST /api/v1/transactions error:",
+      error
+    );
 
     return NextResponse.json(
       {
