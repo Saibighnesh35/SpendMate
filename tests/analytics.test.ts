@@ -1,0 +1,9 @@
+import { describe, expect, it } from "vitest";
+import { getMonthAnalytics } from "@/lib/analytics";
+import { findPotentialDuplicate } from "@/lib/duplicates";
+import { parseMoney } from "@/lib/money";
+import type { Category, PaymentMethod, Transaction } from "@/types";
+
+const cats: Category[]=[{id:"food",name:"Food",color:"#f00"}]; const methods: PaymentMethod[]=[{id:"gpay",name:"GPay",icon:""}];
+const t=(id:string, amountMinor:number,type:Transaction["type"],date="2026-08-20"):Transaction=>({id,amountMinor,type,transactionDate:date,paymentMethodId:"gpay",categoryId:"food",currency:"INR",source:"MANUAL",createdAt:"2026-08-20T00:00:00Z",merchant:"Cafe"});
+describe("financial business rules",()=>{it("calculates credit, debit, net and category summaries using exact minor units",()=>{const result=getMonthAnalytics([t("a",120000,"CREDIT"),t("b",84500,"DEBIT"),t("old",200,"DEBIT","2026-07-20")],cats,methods,new Date("2026-08-01"));expect(result.credits).toBe(120000);expect(result.debits).toBe(84500);expect(result.net).toBe(35500);expect(result.categoryTotals[0]).toMatchObject({name:"Food",amount:84500});});it("excludes soft-deleted transactions from reports",()=>{const deleted={...t("a",500,"DEBIT"),deletedAt:"2026-08-22T00:00:00Z"};expect(getMonthAnalytics([deleted],cats,methods,new Date("2026-08-01")).debits).toBe(0);});it("flags but never removes a likely duplicate",()=>{const input={amountMinor:35000,type:"DEBIT" as const,transactionDate:"2026-08-20",paymentMethodId:"gpay",categoryId:"food",merchant:"Cafe",source:"MANUAL" as const};expect(findPotentialDuplicate(input,[t("a",35000,"DEBIT")])).toMatchObject({id:"a"});});it("rejects zero and malformed monetary input",()=>{expect(parseMoney("₹350.50")).toBe(35050);expect(parseMoney("0")).toBeNull();expect(parseMoney("twelve")).toBeNull();});});
