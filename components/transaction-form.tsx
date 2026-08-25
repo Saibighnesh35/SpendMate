@@ -1,16 +1,562 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { AlertTriangle, Check, ChevronLeft } from "lucide-react";
+
 import { parseMoney } from "@/lib/money";
 import type { Transaction, TransactionInput } from "@/types";
 import { useSpendMate } from "./demo-provider";
 
-export function TransactionForm({existing,source="MANUAL"}:{existing?:Transaction;source?:TransactionInput["source"]}) { const router=useRouter(); const {categories,methods,addTransaction,updateTransaction}=useSpendMate(); const [amount,setAmount]=useState(existing ? String(existing.amountMinor/100) : ""); const [type,setType]=useState<TransactionInput["type"]>(existing?.type??"DEBIT"); const [payment,setPayment]=useState(existing?.paymentMethodId ?? methods[0].id); const [category,setCategory]=useState(existing?.categoryId ?? ""); const [date,setDate]=useState(existing?.transactionDate ?? format(new Date(),"yyyy-MM-dd")); const [merchant,setMerchant]=useState(existing?.merchant??""); const [note,setNote]=useState(existing?.note??""); const [error,setError]=useState(""); const [duplicate,setDuplicate]=useState<Transaction|undefined>();
- const payload=():TransactionInput|undefined=>{ const amountMinor=parseMoney(amount);if(!amountMinor){setError("Enter an amount greater than ₹0.");return;}if(!payment||!date){setError("Choose a payment method and transaction date.");return;}return {amountMinor,type,paymentMethodId:payment,categoryId:category||undefined,transactionDate:date,merchant:merchant.trim()||undefined,note:note.trim()||undefined,source}; };
- const save=(force=false)=>{const input=payload();if(!input)return;setError("");if(existing){updateTransaction(existing.id,input);router.push(`/transactions/${existing.id}`);return;}const result=addTransaction(input,force);if(result.duplicate){setDuplicate(result.duplicate);return;}router.push("/transactions");};
- return <div style={{maxWidth:680,margin:"0 auto"}}><button onClick={()=>router.back()} className="btn btn-secondary" style={{padding:"8px 10px",marginBottom:16}}><ChevronLeft size={17}/> Back</button><div className="card" style={{padding:"clamp(18px,4vw,32px)"}}><p className="eyebrow">{source==="SCREENSHOT"?"Review extracted details":"Fast entry"}</p><h1 className="page-title" style={{fontSize:"1.75rem"}}>{existing?"Edit transaction":source==="SCREENSHOT"?"Confirm your transaction":"Add a transaction"}</h1><p className="muted" style={{marginTop:0}}>{source==="SCREENSHOT"?"Every field is editable before saving.":"Just the essentials — add the rest only if it helps."}</p>
- <div className="grid" style={{gridTemplateColumns:"repeat(2,minmax(0,1fr))",marginTop:24}}><div style={{gridColumn:"1 / -1"}}><label className="label">Amount</label><div style={{position:"relative"}}><span style={{position:"absolute",left:14,top:12,color:"var(--muted)",fontWeight:700}}>₹</span><input autoFocus inputMode="decimal" className="field" style={{paddingLeft:30,fontSize:"1.35rem",fontWeight:700}} value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00"/></div></div><div style={{gridColumn:"1 / -1"}}><label className="label">Transaction type</label><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{(["DEBIT","CREDIT"] as const).map(option=><button type="button" key={option} onClick={()=>setType(option)} className="btn" style={{background:type===option?(option==="DEBIT"?"#fff0eb":"var(--brand-soft)"):"#fff",border:"1px solid "+(type===option?(option==="DEBIT"?"#f2c9b9":"#a9dfc2"):"var(--line)"),color:"var(--ink)"}}>{option==="DEBIT"?"Money out":"Money in"}</button>)}</div></div><div><label className="label">Payment method</label><select className="field" value={payment} onChange={e=>setPayment(e.target.value)}>{methods.filter(m=>m.active!==false).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></div><div><label className="label">Category <span className="muted" style={{fontWeight:400}}>(optional)</span></label><select className="field" value={category} onChange={e=>setCategory(e.target.value)}><option value="">Uncategorized</option>{categories.filter(c=>c.active!==false).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div><label className="label">Date</label><input className="field" type="date" value={date} onChange={e=>setDate(e.target.value)}/></div><div><label className="label">Merchant <span className="muted" style={{fontWeight:400}}>(optional)</span></label><input className="field" maxLength={120} value={merchant} onChange={e=>setMerchant(e.target.value)} placeholder="e.g. Swiggy"/></div><div style={{gridColumn:"1 / -1"}}><label className="label">Note <span className="muted" style={{fontWeight:400}}>(optional)</span></label><textarea className="field" rows={3} maxLength={500} value={note} onChange={e=>setNote(e.target.value)} placeholder="What was this for?"/></div></div>{error&&<p style={{color:"var(--danger)",fontSize:".88rem"}}>{error}</p>}<button className="btn btn-primary" style={{width:"100%",marginTop:22}} onClick={()=>save()}><Check size={18}/>{existing?"Save changes":"Save transaction"}</button></div>
- {duplicate&&<div role="dialog" aria-modal="true" style={{position:"fixed",inset:0,zIndex:20,background:"#17251d88",display:"grid",placeItems:"center",padding:20}}><div className="card" style={{maxWidth:420,padding:25}}><AlertTriangle color="#b7791f"/><h2>This looks similar to one you already added.</h2><p className="muted">Same amount, date, payment method, and merchant. Keeping both is always your decision.</p><div style={{display:"flex",gap:10,justifyContent:"end"}}><button className="btn btn-secondary" onClick={()=>setDuplicate(undefined)}>Cancel</button><button className="btn btn-primary" onClick={()=>save(true)}>Keep both</button></div></div></div>}</div>;
+export function TransactionForm({
+  existing,
+  source = "MANUAL",
+}: {
+  existing?: Transaction;
+  source?: TransactionInput["source"];
+}) {
+  const router = useRouter();
+
+  const {
+    categories,
+    methods,
+    addTransaction,
+    updateTransaction,
+  } = useSpendMate();
+
+  const [amount, setAmount] = useState(
+    existing ? String(existing.amountMinor / 100) : ""
+  );
+
+  const [type, setType] =
+    useState<TransactionInput["type"]>(
+      existing?.type ?? "DEBIT"
+    );
+
+  const [payment, setPayment] = useState(
+    existing?.paymentMethodId ?? methods[0]?.id ?? ""
+  );
+
+  const [category, setCategory] = useState(
+    existing?.categoryId ?? ""
+  );
+
+  const [date, setDate] = useState(
+    existing?.transactionDate ??
+      format(new Date(), "yyyy-MM-dd")
+  );
+
+  const [merchant, setMerchant] = useState(
+    existing?.merchant ?? ""
+  );
+
+  const [note, setNote] = useState(
+    existing?.note ?? ""
+  );
+
+  const [error, setError] = useState("");
+  const [duplicate, setDuplicate] =
+    useState<Transaction | undefined>();
+
+  const [saving, setSaving] = useState(false);
+
+  const payload =
+    (): TransactionInput | undefined => {
+      const amountMinor = parseMoney(amount);
+
+      if (!amountMinor) {
+        setError(
+          "Enter an amount greater than ₹0."
+        );
+        return;
+      }
+
+      if (!payment || !date) {
+        setError(
+          "Choose a payment method and transaction date."
+        );
+        return;
+      }
+
+      return {
+        amountMinor,
+        type,
+        paymentMethodId: payment,
+        categoryId:
+          category || undefined,
+        transactionDate: date,
+        merchant:
+          merchant.trim() || undefined,
+        note:
+          note.trim() || undefined,
+        source,
+      };
+    };
+
+  const save = async (
+    force = false
+  ) => {
+    const input = payload();
+
+    if (!input) return;
+
+    setError("");
+    setSaving(true);
+
+    try {
+      if (existing) {
+        await updateTransaction(
+          existing.id,
+          input
+        );
+
+        router.push(
+          `/transactions/${existing.id}`
+        );
+
+        return;
+      }
+
+      const result =
+        await addTransaction(
+          input,
+          force
+        );
+
+      if (result.duplicate) {
+        setDuplicate(
+          result.duplicate
+        );
+        return;
+      }
+
+      router.push("/transactions");
+    } catch (err) {
+      console.error(
+        "Failed to save transaction:",
+        err
+      );
+
+      setError(
+        "We couldn't save this transaction. Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        maxWidth: 680,
+        margin: "0 auto",
+      }}
+    >
+      <button
+        onClick={() => router.back()}
+        className="btn btn-secondary"
+        style={{
+          padding: "8px 10px",
+          marginBottom: 16,
+        }}
+        disabled={saving}
+      >
+        <ChevronLeft size={17} />
+        Back
+      </button>
+
+      <div
+        className="card"
+        style={{
+          padding:
+            "clamp(18px,4vw,32px)",
+        }}
+      >
+        <p className="eyebrow">
+          {source === "SCREENSHOT"
+            ? "Review extracted details"
+            : "Fast entry"}
+        </p>
+
+        <h1
+          className="page-title"
+          style={{
+            fontSize: "1.75rem",
+          }}
+        >
+          {existing
+            ? "Edit transaction"
+            : source === "SCREENSHOT"
+              ? "Confirm your transaction"
+              : "Add a transaction"}
+        </h1>
+
+        <p
+          className="muted"
+          style={{ marginTop: 0 }}
+        >
+          {source === "SCREENSHOT"
+            ? "Every field is editable before saving."
+            : "Just the essentials — add the rest only if it helps."}
+        </p>
+
+        <div
+          className="grid"
+          style={{
+            gridTemplateColumns:
+              "repeat(2,minmax(0,1fr))",
+            marginTop: 24,
+          }}
+        >
+          <div
+            style={{
+              gridColumn: "1 / -1",
+            }}
+          >
+            <label className="label">
+              Amount
+            </label>
+
+            <div
+              style={{
+                position: "relative",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  left: 14,
+                  top: 12,
+                  color: "var(--muted)",
+                  fontWeight: 700,
+                }}
+              >
+                ₹
+              </span>
+
+              <input
+                autoFocus
+                inputMode="decimal"
+                className="field"
+                style={{
+                  paddingLeft: 30,
+                  fontSize: "1.35rem",
+                  fontWeight: 700,
+                }}
+                value={amount}
+                onChange={(e) =>
+                  setAmount(
+                    e.target.value
+                  )
+                }
+                placeholder="0.00"
+                disabled={saving}
+              />
+            </div>
+          </div>
+
+          <div
+            style={{
+              gridColumn: "1 / -1",
+            }}
+          >
+            <label className="label">
+              Transaction type
+            </label>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              {(
+                ["DEBIT", "CREDIT"] as const
+              ).map((option) => (
+                <button
+                  type="button"
+                  key={option}
+                  onClick={() =>
+                    setType(option)
+                  }
+                  className="btn"
+                  disabled={saving}
+                  style={{
+                    background:
+                      type === option
+                        ? option ===
+                          "DEBIT"
+                          ? "#fff0eb"
+                          : "var(--brand-soft)"
+                        : "#fff",
+                    border:
+                      "1px solid " +
+                      (type === option
+                        ? option ===
+                          "DEBIT"
+                          ? "#f2c9b9"
+                          : "#a9dfc2"
+                        : "var(--line)"),
+                    color: "var(--ink)",
+                  }}
+                >
+                  {option === "DEBIT"
+                    ? "Money out"
+                    : "Money in"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="label">
+              Payment method
+            </label>
+
+            <select
+              className="field"
+              value={payment}
+              onChange={(e) =>
+                setPayment(
+                  e.target.value
+                )
+              }
+              disabled={saving}
+            >
+              {methods
+                .filter(
+                  (m) =>
+                    m.active !== false
+                )
+                .map((m) => (
+                  <option
+                    key={m.id}
+                    value={m.id}
+                  >
+                    {m.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label">
+              Category{" "}
+              <span
+                className="muted"
+                style={{
+                  fontWeight: 400,
+                }}
+              >
+                (optional)
+              </span>
+            </label>
+
+            <select
+              className="field"
+              value={category}
+              onChange={(e) =>
+                setCategory(
+                  e.target.value
+                )
+              }
+              disabled={saving}
+            >
+              <option value="">
+                Uncategorized
+              </option>
+
+              {categories
+                .filter(
+                  (c) =>
+                    c.active !== false
+                )
+                .map((c) => (
+                  <option
+                    key={c.id}
+                    value={c.id}
+                  >
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label">
+              Date
+            </label>
+
+            <input
+              className="field"
+              type="date"
+              value={date}
+              onChange={(e) =>
+                setDate(
+                  e.target.value
+                )
+              }
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label className="label">
+              Merchant{" "}
+              <span
+                className="muted"
+                style={{
+                  fontWeight: 400,
+                }}
+              >
+                (optional)
+              </span>
+            </label>
+
+            <input
+              className="field"
+              maxLength={120}
+              value={merchant}
+              onChange={(e) =>
+                setMerchant(
+                  e.target.value
+                )
+              }
+              placeholder="e.g. Swiggy"
+              disabled={saving}
+            />
+          </div>
+
+          <div
+            style={{
+              gridColumn: "1 / -1",
+            }}
+          >
+            <label className="label">
+              Note{" "}
+              <span
+                className="muted"
+                style={{
+                  fontWeight: 400,
+                }}
+              >
+                (optional)
+              </span>
+            </label>
+
+            <textarea
+              className="field"
+              rows={3}
+              maxLength={500}
+              value={note}
+              onChange={(e) =>
+                setNote(
+                  e.target.value
+                )
+              }
+              placeholder="What was this for?"
+              disabled={saving}
+            />
+          </div>
+        </div>
+
+        {error && (
+          <p
+            style={{
+              color: "var(--danger)",
+              fontSize: ".88rem",
+            }}
+          >
+            {error}
+          </p>
+        )}
+
+        <button
+          className="btn btn-primary"
+          style={{
+            width: "100%",
+            marginTop: 22,
+          }}
+          onClick={() => void save()}
+          disabled={saving}
+        >
+          <Check size={18} />
+          {saving
+            ? "Saving..."
+            : existing
+              ? "Save changes"
+              : "Save transaction"}
+        </button>
+      </div>
+
+      {duplicate && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 20,
+            background: "#17251d88",
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              maxWidth: 420,
+              padding: 25,
+            }}
+          >
+            <AlertTriangle color="#b7791f" />
+
+            <h2>
+              This looks similar to one
+              you already added.
+            </h2>
+
+            <p className="muted">
+              Same amount, date, payment
+              method, and merchant.
+              Keeping both is always your
+              decision.
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                justifyContent: "end",
+              }}
+            >
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  setDuplicate(undefined)
+                }
+                disabled={saving}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="btn btn-primary"
+                onClick={() =>
+                  void save(true)
+                }
+                disabled={saving}
+              >
+                Keep both
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

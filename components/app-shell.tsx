@@ -23,13 +23,17 @@ const links = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
-  const { user } = useSpendMate();
+  const { user, loading } = useSpendMate();
 
   useEffect(() => {
-    if (!user) {
+    if (!user && !loading) {
       router.replace("/login");
     }
-  }, [user, router]);
+  }, [user, router,loading]);
+
+  if (loading) {
+    return null;
+  }
 
   if (!user) {
     return null;
